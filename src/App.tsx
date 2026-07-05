@@ -480,7 +480,15 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const textError = await res.text();
+        console.error("Non-JSON response:", textError);
+        throw new Error(`Phản hồi không hợp lệ từ máy chủ (Mã: ${res.status}). Có thể giáo án đầu vào quá dài khiến server bị quá tải thời gian xử lý (Vercel Timeout). Bạn nên tự cài đặt API Key cá nhân trong "Cấu hình AI" ở Header để chạy trực tiếp không bị giới hạn timeout.`);
+      }
       
       if (!res.ok) {
         throw new Error(data.error || 'Đã có lỗi xảy ra');
