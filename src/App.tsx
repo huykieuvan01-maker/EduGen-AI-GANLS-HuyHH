@@ -20,6 +20,7 @@ export default function App() {
   const [content, setContent] = useState('');
   
   const [result, setResult] = useState<string | null>(null);
+  const [actualModel, setActualModel] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -463,6 +464,7 @@ export default function App() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setActualModel(null);
 
     try {
       let responseText = '';
@@ -472,7 +474,6 @@ export default function App() {
       // Điều này giúp tránh hoàn toàn giới hạn Vercel 10s Timeout đối với các giáo án dài!
       if (customApiKey && customApiKey.trim()) {
         console.log("[Client] Calling Gemini API directly...");
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${customApiKey.trim()}`;
         
         let prompt = '';
         if (mode === 'new') {
@@ -559,25 +560,56 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
 3. Nếu có công thức toán học, bôi đen và nhấn tổ hợp phím Alt + \\ (hoặc dùng chức năng Toggle TeX của MathType) để hiển thị định dạng MathType chuẩn.
 ---`;
 
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: systemInstructionText }] },
-            generationConfig: { temperature: 0.7 }
-          })
-        });
+        // Client-side Fallback Retry Loop
+        const fallbackModels = Array.from(new Set([
+          selectedModel,
+          'gemini-2.5-flash',
+          'gemini-2.5-pro',
+          'gemini-1.5-pro',
+          'gemini-1.5-flash'
+        ]));
 
-        const resData = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(resData.error?.message || `Lỗi từ Gemini API (Mã: ${res.status})`);
+        let lastError: any = null;
+        let success = false;
+
+        for (const modelName of fallbackModels) {
+          try {
+            console.log(`[Client Fallback] Đang thử với model: ${modelName}...`);
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${customApiKey.trim()}`;
+            
+            const res = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstructionText }] },
+                generationConfig: { temperature: 0.7 }
+              })
+            });
+
+            const resData = await res.json();
+            
+            if (!res.ok) {
+              throw new Error(resData.error?.message || `Lỗi API Google Gemini (Status: ${res.status})`);
+            }
+
+            responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (!responseText) {
+              throw new Error("Phản hồi trống từ Gemini.");
+            }
+
+            success = true;
+            usedModel = modelName;
+            console.log(`[Client Fallback] Thành công với model: ${modelName}`);
+            break; // Thành công, thoát vòng lặp
+          } catch (err: any) {
+            console.warn(`[Client Fallback] Gặp lỗi với model ${modelName}:`, err.message || err);
+            lastError = err;
+          }
         }
 
-        responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (!responseText) {
-          throw new Error("Phản hồi trống từ Gemini API.");
+        if (!success) {
+          throw lastError || new Error("Tất cả các model Gemini đều hết hạn ngạch hoặc lỗi.");
         }
       } else {
         // Fallback: Nếu không có key cá nhân, gọi qua Vercel serverless function (dùng server key)
@@ -615,6 +647,7 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
       }
 
       setResult(responseText);
+      setActualModel(usedModel);
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Đã có lỗi xảy ra khi tạo giáo án.');
@@ -878,10 +911,18 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
         <div className="lg:col-span-7 flex flex-col h-[calc(100vh-8rem)]">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/50">
-              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-500" />
-                Kết quả Giáo án
-              </h2>
+              <div className="flex flex-col gap-0.5">
+                <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-500" />
+                  Kết quả Giáo án
+                </h2>
+                {actualModel && (
+                  <span className="text-[10px] text-slate-400 font-medium ml-6">
+                    Mô hình đã dùng: <span className="font-semibold text-indigo-600">{actualModel}</span>
+                    {selectedModel !== actualModel && " (Tự động chuyển đổi do model chính hết quota)"}
+                  </span>
+                )}
+              </div>
               {result && (
                 <div className="flex items-center gap-2">
                   <button
