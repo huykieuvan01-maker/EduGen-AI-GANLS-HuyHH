@@ -665,8 +665,13 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+    <div className="min-h-screen bg-slate-50/20 bg-grid-pattern text-slate-900 font-sans relative overflow-x-hidden">
+      {/* Decorative Glow Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-200/25 blur-3xl opacity-60 pointer-events-none animate-blob -z-10" />
+      <div className="absolute top-[40%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-purple-200/25 blur-3xl opacity-60 pointer-events-none animate-blob animation-delay-2000 -z-10" />
+      <div className="absolute bottom-[-10%] left-[20%] w-[40vw] h-[40vw] rounded-full bg-blue-200/15 blur-3xl opacity-50 pointer-events-none animate-blob animation-delay-4000 -z-10" />
+
+      <header className="glass-header sticky top-0 z-40 shadow-sm/50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white shrink-0">
@@ -708,7 +713,7 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
         
         {/* Left Column: Form */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white p-1 rounded-xl flex gap-1 border border-slate-200 shadow-sm">
+          <div className="glass-panel p-1 rounded-xl flex gap-1 shadow-sm">
             <button
               onClick={() => setMode('new')}
               className={cn(
@@ -731,7 +736,7 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
             </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+          <div className="glass-panel rounded-2xl shadow-lg shadow-slate-100/50 p-6 space-y-5 hover-scale-sm">
             {mode === 'new' ? (
               <>
                 <div>
@@ -909,7 +914,7 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
 
         {/* Right Column: Result */}
         <div className="lg:col-span-7 flex flex-col h-[calc(100vh-8rem)]">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+          <div className="glass-panel rounded-2xl shadow-lg shadow-slate-100/50 flex-1 flex flex-col overflow-hidden hover-scale-sm">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/50">
               <div className="flex flex-col gap-0.5">
                 <h2 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -968,9 +973,9 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100/50 flex items-center justify-between bg-white/40">
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Settings className="w-4 h-4 text-indigo-500" />
                 Cài đặt cấu hình AI
