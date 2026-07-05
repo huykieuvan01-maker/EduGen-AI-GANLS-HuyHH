@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 const SYSTEM_INSTRUCTION = `Bạn là một Chuyên gia Sư phạm cao cấp, chuyên về phương pháp giảng dạy cấp Trung học cơ sở (THCS) tại Việt Nam. Bạn có kiến thức chuyên sâu về Công văn 5512/BGDĐT và Khung năng lực số dành cho học sinh. Nhiệm vụ của bạn là hỗ trợ giáo viên tối ưu hóa quy trình soạn thảo giáo án, đảm bảo tính khoa học, đúng quy định pháp lý và tích hợp công nghệ hiện đại.
 
 ## 2. Objective
@@ -73,7 +71,6 @@ Mỗi kết quả đầu ra phải tuân thủ cấu trúc sau:
 ---`;
 
 export default async function handler(req: any, res: any) {
-  // Chỉ cho phép phương thức POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -81,13 +78,11 @@ export default async function handler(req: any, res: any) {
   try {
     const { mode, lessonName, subject, grade, duration, content, customApiKey, selectedModel } = req.body;
     
-    // Ưu tiên sử dụng API key từ client gửi lên, nếu không có thì dùng biến môi trường của server
     const apiKey = customApiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.status(400).json({ error: 'Yêu cầu API Key để hoạt động. Vui lòng vào phần Cài đặt (Settings) trên Header để nhập API Key của bạn.' });
     }
     
-    const ai = new GoogleGenAI({ apiKey });
     const modelToUse = selectedModel || 'gemini-2.5-flash';
     
     let prompt = '';
@@ -103,7 +98,7 @@ Nội dung giáo án cũ cần chuẩn hóa:
 ${content}`;
     }
 
-    // Danh sách các model fallback tự động thử lại khi gặp lỗi
+    // Danh sách các model fallback
     const fallbackModels = Array.from(new Set([
       modelToUse,
       'gemini-2.5-pro',
@@ -119,35 +114,57 @@ ${content}`;
 
     for (const modelName of fallbackModels) {
       try {
-        console.log(`[Vercel Serverless] Đang thử tạo giáo án với model: ${modelName}...`);
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-            temperature: 0.7,
-          }
-        });
+        console.log(`[Vercel Serverless REST] Đang gọi trực tiếp API với model: ${modelName}...`);
         
-        responseText = response.text || '';
+        // Gọi trực tiếp Google Gemini REST API bằng fetch (không phụ thuộc SDK)
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const apiResponse = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: prompt }] }
+            ],
+            systemInstruction: {
+              parts: [{ text: SYSTEM_INSTRUCTION }]
+            },
+            generationConfig: {
+              temperature: 0.7
+            }
+          })
+        });
+
+        const resData = await apiResponse.json();
+
+        if (!apiResponse.ok) {
+          throw new Error(resData.error?.message || `Lỗi API Google Gemini (Status: ${apiResponse.status})`);
+        }
+
+        responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (!responseText) {
+          throw new Error('Phản hồi trống từ Gemini API.');
+        }
+
         success = true;
         usedModel = modelName;
-        console.log(`[Vercel Serverless] Thành công với model: ${modelName}`);
-        break; // Thành công, thoát vòng lặp
+        console.log(`[Vercel Serverless REST] Thành công với model: ${modelName}`);
+        break; // Thoát vòng lặp khi thành công
       } catch (err: any) {
-        console.warn(`[Vercel Serverless] Thử model ${modelName} thất bại:`, err.message || err);
+        console.warn(`[Vercel Serverless REST] Thử model ${modelName} thất bại:`, err.message || err);
         lastError = err;
       }
     }
 
     if (!success) {
-      console.error('[Vercel Serverless] Tất cả các model đều đã thất bại.');
+      console.error('[Vercel Serverless REST] Tất cả các model đều đã thất bại.');
       throw lastError || new Error('Tất cả các model AI đều thất bại.');
     }
 
     return res.status(200).json({ result: responseText, model: usedModel });
   } catch (error: any) {
-    console.error('Error generating lesson plan in Vercel Serverless:', error);
+    console.error('Error generating lesson plan in Vercel Serverless REST:', error);
     return res.status(500).json({ error: error.message || 'Lỗi khi tạo giáo án' });
   }
 }
